@@ -126,6 +126,13 @@ It reports what changed. It does not decide whether a change is malicious, and a
 
 Local actions (`./path`) and container references (`docker://`) are skipped. A local action's code already appears in the pull request diff.
 
+## Background
+
+[The pin you stopped reading](docs/the-pin-you-stopped-reading.md) explains the
+problem this tool exists for: why SHA pinning works, how Dependabot quietly
+turns it back into unreviewed trust, and why the `# v4.2.2` comment is a claim
+nothing verifies.
+
 ## Requirements
 
 - Node.js 24 or newer
