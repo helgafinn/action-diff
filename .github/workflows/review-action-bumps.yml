@@ -1,0 +1,72 @@
+name: Review action bumps
+
+# action-diff reviewing its own dependency bumps.
+#
+# This is the tool's real acceptance test. Fixtures prove the rules fire; a live
+# Dependabot pull request proves the whole path works — detection from Git
+# history, fetching both revisions from the API, provenance, and classification —
+# against revisions nobody chose in advance.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/**
+      - action.yml
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # A shallow clone has no base commit to compare against, so there
+          # would be nothing to detect a bump from.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: review
+        uses: ./
+        with:
+          # Report rather than block. A repository that cannot merge its own
+          # Dependabot pull requests stops receiving the fixes that pinning
+          # defers, which defeats the point of pinning.
+          fail-on: never
+
+      - name: Comment the review
+        if: steps.review.outputs.bumps != '0'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          # Passed through the environment rather than interpolated into the
+          # script body. A `${{ }}` substitution is textual, so report content
+          # would become executable JavaScript — the same untrusted-input
+          # injection this tool exists to catch elsewhere.
+          REPORT: ${{ steps.review.outputs.markdown }}
+        with:
+          script: |
+            const marker = '<!-- action-diff -->';
+            const body = `${marker}\n${process.env.REPORT ?? ''}`;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((comment) => comment.body?.startsWith(marker));
+
+            // Update in place so a pull request that gets pushed to repeatedly
+            // carries one current review instead of a pile of stale ones.
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body,
+              });
+              return;
+            }
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body,
+            });

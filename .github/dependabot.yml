@@ -1,0 +1,22 @@
+version: 2
+
+updates:
+  # Actions are pinned to commit SHAs, which is the practice this repository's
+  # own tool argues for. A pin only stays safe while somebody keeps it current,
+  # so Dependabot supplies the bumps and action-diff reviews them.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-dependencies:
+        dependency-type: development
