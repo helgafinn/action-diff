@@ -136,6 +136,23 @@ export async function reviewBumps(
       findings.push(...provenanceFindings(bump.after, provenance));
     }
 
+    // Replacing a tag with the commit it already points at changes the reference
+    // without changing what runs. Saying so is better than presenting an empty
+    // review, which reads as "we found nothing" when the truth is "there was
+    // nothing to find". Provenance still applies: it is what confirms the new
+    // pin really is the release the old tag named.
+    if (before !== undefined && before.sha === after.sha) {
+      findings.push({
+        code: 'pin.hardened',
+        severity: 'info',
+        message:
+          `${bump.before.ref} and ${bump.after.ref} are the same commit `
+          + `${after.sha.slice(0, 12)}. The reference changed; the code did not.`,
+        before: bump.before.ref,
+        after: bump.after.ref,
+      });
+    }
+
     // Provenance stands on the new revision alone, so a missing previous
     // revision still produces a partial review rather than silence.
     if (before === undefined) {
@@ -143,7 +160,7 @@ export async function reviewBumps(
         action: bump.action,
         reason: `compared provenance only; could not resolve previous revision ${bump.before.raw}`,
       });
-    } else {
+    } else if (before.sha !== after.sha) {
       findings.push(...classifyRevisions(before, after));
     }
 

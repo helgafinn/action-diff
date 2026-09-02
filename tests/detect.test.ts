@@ -103,3 +103,24 @@ test('treats a move from tag to sha as a bump', async (context) => {
   assert.equal(bumps[0]?.before.ref, 'v4');
   assert.equal(bumps[0]?.after.ref, NEW);
 });
+
+// Regression: found by running action-diff on its own pin-hardening commit.
+//
+// Replacing `@v5` with the commit `v5` already points at is a reference change
+// with no code change. detectBumps compares reference strings, so it correctly
+// sees a difference — but the review that follows must explain that both sides
+// resolve to one commit rather than presenting an empty finding list, which
+// reads as "we looked and found nothing" instead of "there was nothing there".
+test('a tag replaced by its own commit is still detected as a reference change', async (context) => {
+  const repo = repositoryWith(
+    workflow('actions/checkout@v5'),
+    workflow(`actions/checkout@${NEW} # v5`),
+  );
+  context.after(repo.cleanup);
+
+  const bumps = await detectBumps({ root: repo.root }, 'HEAD~1', 'HEAD');
+  assert.equal(bumps.length, 1);
+  assert.equal(bumps[0]?.before.ref, 'v5');
+  assert.equal(bumps[0]?.after.ref, NEW);
+  assert.equal(bumps[0]?.after.versionComment, 'v5');
+});

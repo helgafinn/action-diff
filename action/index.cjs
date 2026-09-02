@@ -8210,12 +8210,21 @@ async function reviewBumps(client, options) {
     if (provenance !== void 0) {
       findings.push(...provenanceFindings(bump.after, provenance));
     }
+    if (before !== void 0 && before.sha === after.sha) {
+      findings.push({
+        code: "pin.hardened",
+        severity: "info",
+        message: `${bump.before.ref} and ${bump.after.ref} are the same commit ${after.sha.slice(0, 12)}. The reference changed; the code did not.`,
+        before: bump.before.ref,
+        after: bump.after.ref
+      });
+    }
     if (before === void 0) {
       skipped.push({
         action: bump.action,
         reason: `compared provenance only; could not resolve previous revision ${bump.before.raw}`
       });
-    } else {
+    } else if (before.sha !== after.sha) {
       findings.push(...classifyRevisions(before, after));
     }
     reviews.push({
