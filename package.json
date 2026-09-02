@@ -1,0 +1,78 @@
+{
+  "name": "action-diff",
+  "version": "0.1.0",
+  "description": "Review what a pinned GitHub Action SHA bump actually changes before you approve it.",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "npm@11.19.0",
+  "bin": {
+    "action-diff": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "action/",
+    "docs/",
+    "action.yml",
+    "CONTRIBUTING.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "node --eval \"import('node:fs').then(({ rmSync }) => { rmSync('dist', { recursive: true, force: true }); rmSync('action', { recursive: true, force: true }); })\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test tests/**/*.test.ts",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:action": "esbuild src/action.ts --bundle --platform=node --target=node24 --format=cjs --outfile=action/index.cjs",
+    "build": "npm run clean && npm run build:types && npm run build:action",
+    "check": "npm run typecheck && npm test && npm run build",
+    "prepare": "node --run build",
+    "prepack": "npm run check"
+  },
+  "dependencies": {
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "@actions/core": "3.0.1",
+    "@types/node": "24.13.3",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2"
+  },
+  "keywords": [
+    "github-actions",
+    "actions",
+    "dependabot",
+    "supply-chain-security",
+    "sha-pinning",
+    "dependency-review",
+    "action-diff",
+    "provenance",
+    "ci",
+    "security",
+    "developer-tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/helgafinn/action-diff.git"
+  },
+  "bugs": {
+    "url": "https://github.com/helgafinn/action-diff/issues"
+  },
+  "homepage": "https://github.com/helgafinn/action-diff#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}

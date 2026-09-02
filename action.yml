@@ -1,0 +1,49 @@
+name: Pinned Action Review
+description: Review what a pinned GitHub Action SHA bump actually changes before approving it.
+author: helgafinn
+
+inputs:
+  base:
+    description: Revision to compare against. Defaults to the pull request base branch.
+    required: false
+  root:
+    description: Repository root containing .github/workflows.
+    required: false
+    default: .
+  paths:
+    description: Optional newline-delimited workflow paths to restrict the review to.
+    required: false
+  fail-on:
+    description: Failure threshold — critical, high, medium, low, info, or never.
+    required: false
+    default: high
+  skip-provenance:
+    description: Skip upstream provenance checks and only diff action source.
+    required: false
+    default: 'false'
+  token:
+    description: Token used to read public action repositories. Defaults to github.token.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  bumps:
+    description: Number of pinned action bumps reviewed.
+  critical:
+    description: Number of critical findings.
+  high:
+    description: Number of high findings.
+  highest-severity:
+    description: Highest severity found, or "none".
+  markdown:
+    description: Markdown report, suitable for a pull request comment.
+  passed:
+    description: Whether the review stayed below the failure threshold.
+
+runs:
+  using: node24
+  main: action/index.cjs
+
+branding:
+  icon: git-pull-request
+  color: purple

@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run check
+
+      - name: Verify bundled action is tracked and current
+        run: |
+          git diff --exit-code -- action/
+          git ls-files --error-unmatch action/index.cjs
+          test -z "$(git status --porcelain --untracked-files=all -- action/)"
+
+      - name: Verify package contents
+        run: npm pack --dry-run
