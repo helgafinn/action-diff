@@ -1,4 +1,4 @@
-# The pin you stopped reading
+# Pinning GitHub Actions to a SHA is not protection
 
 In March 2025 an attacker compromised `tj-actions/changed-files` and rewrote its
 release tags to point at malicious code. The injected code dumped runner memory
