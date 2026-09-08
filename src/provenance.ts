@@ -1,5 +1,5 @@
 import type { GitHubClient } from './github.js';
-import { isFullSha } from './refs.js';
+import { isFullSha, versionClaimSatisfiedBy } from './refs.js';
 import type { ActionRef, Finding, Provenance } from './types.js';
 
 /**
@@ -125,7 +125,26 @@ export function provenanceFindings(ref: ActionRef, provenance: Provenance): Find
     });
   }
 
-  if (provenance.tagPointsElsewhere !== undefined) {
+  if (
+    provenance.tagPointsElsewhere !== undefined
+    && versionClaimSatisfiedBy(ref.versionComment, provenance.reachableFrom)
+  ) {
+    // The comment names a floating tag and the pinned commit does sit in that
+    // line, so the tag having advanced is how floating tags work. Saying "the tag
+    // was moved" here would put normal staleness next to genuine retag evidence
+    // and teach reviewers to skim past both.
+    findings.push({
+      code: 'pin.behind-floating-tag',
+      severity: 'low',
+      message:
+        `${ref.slug} is pinned to ${provenance.sha.slice(0, 12)} and labelled `
+        + `${ref.versionComment ?? 'a release'}, which is accurate, but that tag now `
+        + `points at ${provenance.tagPointsElsewhere.slice(0, 12)}. The pin is behind `
+        + 'the line it names.',
+      before: provenance.sha,
+      after: provenance.tagPointsElsewhere,
+    });
+  } else if (provenance.tagPointsElsewhere !== undefined) {
     findings.push({
       code: 'provenance.tag-mismatch',
       severity: 'critical',

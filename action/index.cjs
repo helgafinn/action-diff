@@ -7921,17 +7921,35 @@ function normalizeVersionComment(comment) {
   const match = /(?:^|[\s@])(v?\d+(?:\.\d+)*(?:-[0-9A-Za-z.-]+)?)/u.exec(comment.trim());
   return match?.[1];
 }
+function versionClaimSatisfiedBy(claim, refs) {
+  if (claim === void 0) return false;
+  const wanted = bareVersion(claim);
+  if (wanted === "") return false;
+  for (const entry of refs) {
+    if (!entry.startsWith("tag:")) continue;
+    const actual = bareVersion(entry.slice("tag:".length));
+    if (actual.startsWith(`${wanted}.`)) return true;
+  }
+  return false;
+}
+function bareVersion(value) {
+  const tail = value.slice(value.lastIndexOf("/") + 1);
+  return tail.replace(/^codeql-bundle-/u, "").replace(/^v/u, "");
+}
 function actionIdentity(ref) {
   return ref.subpath === void 0 ? ref.slug : `${ref.slug}/${ref.subpath}`;
 }
 function extractActionRefs(source) {
   const found = [];
   const pattern = /(?:^|\s)uses\s*:\s*(?:'([^']*)'|"([^"]*)"|([^\s#]+))[^\S\n]*(?:#[^\S\n]*([^\n]*))?/gmu;
-  for (const match of source.matchAll(pattern)) {
-    const raw = match[1] ?? match[2] ?? match[3];
-    if (raw === void 0) continue;
-    const ref = parseActionRef(raw, match[4]);
-    if (ref !== void 0) found.push(ref);
+  for (const line of source.split("\n")) {
+    if (line.trimStart().startsWith("#")) continue;
+    for (const match of line.matchAll(pattern)) {
+      const raw = match[1] ?? match[2] ?? match[3];
+      if (raw === void 0) continue;
+      const ref = parseActionRef(raw, match[4]);
+      if (ref !== void 0) found.push(ref);
+    }
   }
   return found;
 }
@@ -8118,7 +8136,15 @@ function provenanceFindings(ref, provenance) {
       after: provenance.sha
     });
   }
-  if (provenance.tagPointsElsewhere !== void 0) {
+  if (provenance.tagPointsElsewhere !== void 0 && versionClaimSatisfiedBy(ref.versionComment, provenance.reachableFrom)) {
+    findings.push({
+      code: "pin.behind-floating-tag",
+      severity: "low",
+      message: `${ref.slug} is pinned to ${provenance.sha.slice(0, 12)} and labelled ${ref.versionComment ?? "a release"}, which is accurate, but that tag now points at ${provenance.tagPointsElsewhere.slice(0, 12)}. The pin is behind the line it names.`,
+      before: provenance.sha,
+      after: provenance.tagPointsElsewhere
+    });
+  } else if (provenance.tagPointsElsewhere !== void 0) {
     findings.push({
       code: "provenance.tag-mismatch",
       severity: "critical",
