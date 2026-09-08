@@ -136,3 +136,44 @@ test('reports an unreachable upstream as unverified rather than as tampering', a
   assert.deepEqual(codes(findings), ['provenance.unverified']);
   assert.equal(findings[0]?.severity, 'low');
 });
+
+test('a floating major tag that has moved past the pin is not a tag mismatch', () => {
+  // `# v4` names a floating tag whose whole purpose is to advance. The pinned
+  // commit carrying v4.1.0 is inside that line, so the tag pointing elsewhere is
+  // ordinary staleness, not the retag shape that provenance.tag-mismatch means.
+  const ref = parseActionRef(`owner/repo@${PINNED}`, '# v4') as ActionRef;
+  const findings = provenanceFindings(ref, {
+    sha: PINNED,
+    reachableFrom: ['tag:v4.1.0'],
+    onDefaultBranch: true,
+    tagPointsElsewhere: OTHER,
+  });
+  const codes = findings.map((f: Finding) => f.code);
+  assert.ok(!codes.includes('provenance.tag-mismatch'), `got ${codes.join(', ')}`);
+});
+
+test('a specific version claim that disagrees is still a tag mismatch', () => {
+  // v2.4.0 is not a floating tag. A commit tagged v7.0.0 is not that release, so
+  // this must keep reporting.
+  const ref = parseActionRef(`owner/repo@${PINNED}`, '# v2.4.0') as ActionRef;
+  const findings = provenanceFindings(ref, {
+    sha: PINNED,
+    reachableFrom: ['tag:v7.0.0'],
+    onDefaultBranch: true,
+    tagPointsElsewhere: OTHER,
+  });
+  assert.ok(findings.some((f: Finding) => f.code === 'provenance.tag-mismatch'));
+});
+
+test('a floating claim with no matching tag on the pin still reports', () => {
+  // If the pinned commit carries nothing in the v4 line, `# v4` is not a
+  // truthful description of it and the mismatch stands.
+  const ref = parseActionRef(`owner/repo@${PINNED}`, '# v4') as ActionRef;
+  const findings = provenanceFindings(ref, {
+    sha: PINNED,
+    reachableFrom: ['tag:v9.9.9'],
+    onDefaultBranch: true,
+    tagPointsElsewhere: OTHER,
+  });
+  assert.ok(findings.some((f: Finding) => f.code === 'provenance.tag-mismatch'));
+});

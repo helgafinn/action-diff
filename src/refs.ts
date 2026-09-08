@@ -63,6 +63,50 @@ export function normalizeVersionComment(comment: string | undefined): string | u
   return match?.[1];
 }
 
+/**
+ * Whether a version comment truthfully describes a commit carrying these refs.
+ *
+ * A floating tag exists to advance. `# v4` on a commit tagged v4.1.0 is an
+ * accurate description of the v4 line, so the fact that `v4` now points at a
+ * newer commit is ordinary staleness rather than the retag shape that matters.
+ * A more specific claim is held to the letter: `# v2.4.0` on a commit tagged
+ * v7.0.0 names a release the commit is not.
+ *
+ * `refs` are the `tag:`/`branch:` entries observed on the pinned commit.
+ */
+export function versionClaimSatisfiedBy(
+  claim: string | undefined,
+  refs: readonly string[],
+): boolean {
+  if (claim === undefined) return false;
+  const wanted = bareVersion(claim);
+  if (wanted === '') return false;
+  for (const entry of refs) {
+    if (!entry.startsWith('tag:')) continue;
+    const actual = bareVersion(entry.slice('tag:'.length));
+    // Strict prefix only. `# v4` against a v4.1.0 pin is a floating claim and the
+    // tag advancing is expected. An exact match is different: if the comment says
+    // v4.2.2, the pin carries v4.2.2, and that tag now resolves to another commit,
+    // the tag was moved off this commit — which is the retag this tool exists to
+    // catch, and must not be softened.
+    if (actual.startsWith(`${wanted}.`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Strips a tag down to a comparable version.
+ *
+ * Monorepo action collections namespace tags by sub-action, as in
+ * `get-vault-secrets/v1.3.1`, and codeql-action publishes `codeql-bundle-vX.Y.Z`.
+ * In both cases the sub-action is already identified by the `uses:` path, so the
+ * prefix carries no information for this comparison.
+ */
+function bareVersion(value: string): string {
+  const tail = value.slice(value.lastIndexOf('/') + 1);
+  return tail.replace(/^codeql-bundle-/u, '').replace(/^v/u, '');
+}
+
 /** The identity that must match for two references to be the same action. */
 export function actionIdentity(ref: ActionRef): string {
   return ref.subpath === undefined ? ref.slug : `${ref.slug}/${ref.subpath}`;
@@ -81,11 +125,17 @@ export function extractActionRefs(source: string): ActionRef[] {
   const found: ActionRef[] = [];
   const pattern = /(?:^|\s)uses\s*:\s*(?:'([^']*)'|"([^"]*)"|([^\s#]+))[^\S\n]*(?:#[^\S\n]*([^\n]*))?/gmu;
 
-  for (const match of source.matchAll(pattern)) {
-    const raw = match[1] ?? match[2] ?? match[3];
-    if (raw === undefined) continue;
-    const ref = parseActionRef(raw, match[4]);
-    if (ref !== undefined) found.push(ref);
+  for (const line of source.split('\n')) {
+    // A commented-out step is not a live pin. Reviewing one produces findings
+    // about code that never runs. Only a leading `#` disables a line; the
+    // trailing inline comment is where the version claim lives and is still read.
+    if (line.trimStart().startsWith('#')) continue;
+    for (const match of line.matchAll(pattern)) {
+      const raw = match[1] ?? match[2] ?? match[3];
+      if (raw === undefined) continue;
+      const ref = parseActionRef(raw, match[4]);
+      if (ref !== undefined) found.push(ref);
+    }
   }
   return found;
 }

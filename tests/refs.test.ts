@@ -91,11 +91,45 @@ jobs:
 // A step named "uses" or prose mentioning uses must not be mistaken for a
 // reference, and a comment on its own line must not attach to the previous one.
 test('does not invent references from surrounding text', () => {
+  // The `uses:` inside a `name:` value is prose, not a reference. The commented
+  // line is deliberately excluded too: a disabled step is not a live pin, so a
+  // finding about its version comment describes code that cannot run.
   const refs = extractActionRefs(`
       - name: this uses: something informal
         run: echo hi
       # uses: owner/repo@v1
 `);
+  assert.deepEqual(refs, []);
+});
+
+test('ignores a uses: line that is commented out', () => {
+  // A disabled step is not a live pin. Reviewing its version comment produces a
+  // finding about code that does not run.
+  const source = [
+    'steps:',
+    '  # - name: Harden Runner',
+    `  #   uses: step-security/harden-runner@${SHA} # v2.5.1`,
+    '  #   with:',
+    '  #     egress-policy: audit',
+  ].join('\n');
+  assert.deepEqual(extractActionRefs(source), []);
+});
+
+test('still finds a live reference alongside a commented-out one', () => {
+  const source = [
+    'steps:',
+    `  #   uses: owner/disabled@${SHA} # v1`,
+    `  - uses: owner/live@${SHA} # v2`,
+  ].join('\n');
+  const refs = extractActionRefs(source);
   assert.equal(refs.length, 1);
-  assert.equal(refs[0]?.slug, 'owner/repo');
+  assert.equal(refs[0]?.slug, 'owner/live');
+});
+
+test('a trailing inline comment is still read as a version claim', () => {
+  // Only a leading `#` disables a line. An inline trailing comment is the normal
+  // way the version is recorded and must keep working.
+  const refs = extractActionRefs(`  - uses: owner/repo@${SHA} # v4.2.2`);
+  assert.equal(refs.length, 1);
+  assert.equal(refs[0]?.versionComment, 'v4.2.2');
 });
