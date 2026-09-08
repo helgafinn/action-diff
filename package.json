@@ -1,6 +1,6 @@
 {
   "name": "action-diff",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Review what a pinned GitHub Action SHA bump actually changes before you approve it.",
   "type": "module",
   "license": "MIT",
